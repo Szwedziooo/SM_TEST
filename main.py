@@ -2,7 +2,7 @@ import tkinter as tk
 import serial
 
 # Utworzenie połączenia z portem szeregowym
-ser = serial.Serial('COM4', 115200)
+ser = serial.Serial('COM5', 115200)
 
 # Globalne zmienne do przechowywania ostatnich ustawień PID
 last_kp = 0.0
