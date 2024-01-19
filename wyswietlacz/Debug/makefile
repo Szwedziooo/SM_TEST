@@ -34,34 +34,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := wyswietlacz
+BUILD_ARTIFACT_NAME := Projekt
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-wyswietlacz.elf \
+Projekt.elf \
 
 MAP_FILES += \
-wyswietlacz.map \
+Projekt.map \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-wyswietlacz.list \
+Projekt.list \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: wyswietlacz.elf secondary-outputs
+main-build: Projekt.elf secondary-outputs
 
 # Tool invocations
-wyswietlacz.elf wyswietlacz.map: $(OBJS) $(USER_OBJS) C:\Users\jacek\STM32CubeIDE\workspace_1.13.2\wyswietlacz\STM32F746ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "wyswietlacz.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\jacek\STM32CubeIDE\workspace_1.13.2\wyswietlacz\STM32F746ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="wyswietlacz.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Projekt.elf Projekt.map: $(OBJS) $(USER_OBJS) C:\Users\Jakub\STM32CubeIDE\workspace_1.13.2\Projekt\STM32F746ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Projekt.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"C:\Users\Jakub\STM32CubeIDE\workspace_1.13.2\Projekt\STM32F746ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Projekt.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -70,14 +70,14 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-wyswietlacz.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "wyswietlacz.list"
+Projekt.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "Projekt.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) default.size.stdout wyswietlacz.elf wyswietlacz.list wyswietlacz.map
+	-$(RM) Projekt.elf Projekt.list Projekt.map default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)
