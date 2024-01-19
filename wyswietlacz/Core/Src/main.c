@@ -70,6 +70,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim9;
 
 UART_HandleTypeDef huart3;
 
@@ -112,6 +113,9 @@ _Bool clear_screan_flag = 1;
 int screen_number = 0;
 int test_rpm;
 
+int usart_Mode = 0;
+_Bool matlab_Sent = 0;
+
 
 struct string_pair {
 	char line1[16];
@@ -131,6 +135,7 @@ static void MX_TIM3_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
+static void MX_TIM9_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -179,16 +184,24 @@ void PID_Control() {
 	prevError = error;
 }
 
+
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+
 	if (htim == &htim2) {
 		PID_Control();
 	}
+
 	//jacek
 	if (htim->Instance == TIM5) {
 		HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 		tim5_tick = 1;
-
 	}
+
+	if(htim = &htim9 && usart_Mode == 1){
+		matlab_Sent = 1;
+	}
+
 }
 
 
@@ -221,52 +234,154 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 }
 
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart->Instance == USART3) {
-		// Sprawdź, czy otrzymano znak końca linii.
-		if (rxBuffer[rxIndex] == '\n') {
-			// Zakończ łańcuch znaków przed znakiem nowej linii, aby utworzyć poprawny string C.
-			rxBuffer[rxIndex] = '\0';
-			// Użyj formatu, który ignoruje niechciane znaki przed liczbą.
-			if (sscanf(rxBuffer, "RPM%d", &W_RPM_terminal) == 1) {
-				//ograniczenie do bezpiecznego zakresu sterowania
-				if (W_RPM_terminal < 2000) {
-					W_RPM_terminal = 2000;
-				} else if (W_RPM_terminal > 15000) {
-					W_RPM_terminal = 15000;
-				}
-				W_rpm_setpoint = W_RPM_terminal;
-				// Wyczyszczenie bufora po pomyślnym odczycie.
-				memset(rxBuffer, 0, sizeof(rxBuffer));
-				// Resetowanie indeksu bufora.
-				rxIndex = 0;
-				// Ustaw flagę oznaczającą dostępność nowych danych.
-				newDataFlag = 1;
-			} else {
-				// Obsługa błędów w przypadku niepowodzenia odczytu.
-			}
-		} else {
-			// Upewnij się, że nie przekroczysz rozmiaru bufora.
-			if (rxIndex < RX_BUFFER_SIZE - 1) {
-				rxIndex++;
-			} else {
-				// Obsługa błędów w przypadku przekroczenia bufora.
-			}
-		}
+//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+//	if (huart->Instance == USART3) {
+//		// Sprawdź, czy otrzymano znak końca linii.
+//		if (rxBuffer[rxIndex] == '\n') {
+//			// Zakończ łańcuch znaków przed znakiem nowej linii, aby utworzyć poprawny string C.
+//			rxBuffer[rxIndex] = '\0';
+//			// Użyj formatu, który ignoruje niechciane znaki przed liczbą.
+//			if (sscanf(rxBuffer, "RPM%d", &W_RPM_terminal) == 1) {
+//				//ograniczenie do bezpiecznego zakresu sterowania
+//				if (W_RPM_terminal < 2000) {
+//					W_RPM_terminal = 2000;
+//				} else if (W_RPM_terminal > 15000) {
+//					W_RPM_terminal = 15000;
+//				}
+//				W_rpm_setpoint = W_RPM_terminal;
+//				// Wyczyszczenie bufora po pomyślnym odczycie.
+//				memset(rxBuffer, 0, sizeof(rxBuffer));
+//				// Resetowanie indeksu bufora.
+//				rxIndex = 0;
+//				// Ustaw flagę oznaczającą dostępność nowych danych.
+//				newDataFlag = 1;
+//			} else {
+//				// Obsługa błędów w przypadku niepowodzenia odczytu.
+//			}
+//		} else {
+//			// Upewnij się, że nie przekroczysz rozmiaru bufora.
+//			if (rxIndex < RX_BUFFER_SIZE - 1) {
+//				rxIndex++;
+//			} else {
+//				// Obsługa błędów w przypadku przekroczenia bufora.
+//			}
+//		}
+//
+//		// Ponowne włączenie odbierania przerwań z następnym bajtem w buforze.
+//		HAL_UART_Receive_IT(&huart3, (uint8_t*) &rxBuffer[rxIndex], 1);
+//	}
+//}
 
-		// Ponowne włączenie odbierania przerwań z następnym bajtem w buforze.
-		HAL_UART_Receive_IT(&huart3, (uint8_t*) &rxBuffer[rxIndex], 1);
-	}
+
+void sendToMatlab(float measuredValue, int W_rpm_setpoint, float controlValue) {
+    char buffer[50];
+    int n = sprintf(buffer, "%f,%d,%f\n", measuredValue, W_rpm_setpoint, controlValue);
+    HAL_UART_Transmit(&huart3, (uint8_t*)buffer, n, 100);
 }
+
+
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+
+
+    if (huart->Instance == USART3) {
+    	if(usart_Mode == 0){
+    		// Sprawdź, czy otrzymano znak końca linii.
+    		if (rxBuffer[rxIndex] == '\n') {
+    			// Zakończ łańcuch znaków przed znakiem nowej linii, aby utworzyć poprawny string C.
+    			rxBuffer[rxIndex] = '\0';
+    			// Użyj formatu, który ignoruje niechciane znaki przed liczbą.
+    			if (sscanf(rxBuffer, "RPM%d", &W_RPM_terminal) == 1) {
+    				//ograniczenie do bezpiecznego zakresu sterowania
+    				if (W_RPM_terminal < 2000) {
+    					W_RPM_terminal = 2000;
+    				} else if (W_RPM_terminal > 15000) {
+    					W_RPM_terminal = 15000;
+    				}
+    				W_rpm_setpoint = W_RPM_terminal;
+    				// Wyczyszczenie bufora po pomyślnym odczycie.
+    				memset(rxBuffer, 0, sizeof(rxBuffer));
+    				// Resetowanie indeksu bufora.
+    				rxIndex = 0;
+    				// Ustaw flagę oznaczającą dostępność nowych danych.
+    				newDataFlag = 1;
+    			} else {
+    				// Obsługa błędów w przypadku niepowodzenia odczytu.
+    			}
+    		} else {
+    			// Upewnij się, że nie przekroczysz rozmiaru bufora.
+    			if (rxIndex < RX_BUFFER_SIZE - 1) {
+    				rxIndex++;
+    			} else {
+    				// Obsługa błędów w przypadku przekroczenia bufora.
+    			}
+    		}
+
+    		// Ponowne włączenie odbierania przerwań z następnym bajtem w buforze.
+    		HAL_UART_Receive_IT(&huart3, (uint8_t*) &rxBuffer[rxIndex], 1);
+    	}
+    	if(usart_Mode == 1){
+            // Sprawdź, czy otrzymano znak końca linii.
+            if (rxBuffer[rxIndex] == '\n') {
+                // Zakończ łańcuch znaków przed znakiem nowej linii, aby utworzyć poprawny string C.
+                rxBuffer[rxIndex] = '\0';
+                // Tymczasowe zmienne do przechowywania przetworzonych wartości
+                int temp_rpm;
+                float temp_kp, temp_ki, temp_kd;
+
+                // Przetwarzanie otrzymanych danych
+                if (sscanf(rxBuffer, "SET:%d:%f:%f:%f", &temp_rpm, &temp_kp, &temp_ki, &temp_kd) == 4) {
+                    // Przypisz przetworzone wartości do zmiennych globalnych
+                    W_rpm_setpoint = temp_rpm;
+                    Kp = temp_kp;
+                    Ki = temp_ki;
+                    Kd = temp_kd;
+
+                    // Wyczyszczenie bufora po pomyślnym odczycie
+                    memset(rxBuffer, 0, sizeof(rxBuffer));
+                    // Resetowanie indeksu bufora
+                    rxIndex = 0;
+                    // Ustaw flagę oznaczającą dostępność nowych danych
+                    newDataFlag = 1;
+                } else {
+                    // Obsługa błędów w przypadku niepowodzenia odczytu
+                    // Możesz tutaj dodać własną logikę obsługi błędów
+                }
+            } else {
+                // Upewnij się, że nie przekroczysz rozmiaru bufora
+                if (rxIndex < RX_BUFFER_SIZE - 1) {
+                    rxIndex++;
+                } else {
+                    // Obsługa błędów w przypadku przekroczenia bufora
+                    // Możesz tutaj dodać własną logikę obsługi błędów
+                }
+            }
+
+            // Ponowne włączenie odbierania przerwań z następnym bajtem w buforze
+            HAL_UART_Receive_IT(&huart3, (uint8_t *)&rxBuffer[rxIndex], 1);
+    	}
+
+    }
+}
+
+void test(){}
+
 
 //jacek
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == MODE_Btn_Pin) {
 		if (HAL_GPIO_ReadPin(MODE_Btn_GPIO_Port, MODE_Btn_Pin)) {
 			screen_number++;
-			if (screen_number == 2)
+			if (screen_number == 3)
 				screen_number = 0;
 			clear_screan_flag = 1;
+		}
+	}
+
+	if(GPIO_Pin == USER_Btn_Pin){
+		usart_Mode ++;
+		if(usart_Mode == 3){
+			usart_Mode = 0;
 		}
 	}
 }
@@ -280,18 +395,13 @@ void DisplayActualInfo(const char line1[], const char line2[]) {
 	print(line2);
 }
 
-void ShowInfo() {
+void ShowInfo(char line1[], char line2[], int value) {
 	static int string_len = 16;
 
-	char rpm[16] = "";
+	char string[16] = "";
 
-	sprintf(rpm, "%i RPM   ", test_rpm);
-//	if (strlen(rpm) < string_len) {
-//		//string_len = strlen(rpm);
-//		//clear();
-//	}
-
-	DisplayActualInfo("Speed:", rpm);
+	sprintf(string, line2, value);
+	DisplayActualInfo(line1, string);
 }
 
 void Autorzy() {
@@ -346,6 +456,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM4_Init();
   MX_TIM5_Init();
+  MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 	HAL_TIM_Base_Start_IT(&htim2);
@@ -358,9 +469,10 @@ int main(void)
 
 
 	//__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 10);
-
+	HAL_TIM_Base_Start_IT(&htim9);
 	//jacek
 	HAL_TIM_Base_Start_IT(&htim5);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -375,9 +487,13 @@ int main(void)
 					switch (screen_number) {
 					case 0:
 						test_rpm = (measuredValue);
-						ShowInfo();
+						ShowInfo("Speed:", "%i RPM   ",test_rpm);
 						break;
 					case 1:
+						test_rpm = (measuredValue);
+						ShowInfo("Usart Mode:", "%i   ",usart_Mode);
+						break;
+					case 2:
 						Autorzy();
 						break;
 					default:
@@ -385,6 +501,12 @@ int main(void)
 					}
 					tim5_tick = 0;
 				}
+
+		if(matlab_Sent){
+			sendToMatlab(measuredValue, W_rpm_setpoint, controlValue);
+			matlab_Sent = 0;
+		}
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -684,6 +806,44 @@ static void MX_TIM5_Init(void)
   /* USER CODE BEGIN TIM5_Init 2 */
 
   /* USER CODE END TIM5_Init 2 */
+
+}
+
+/**
+  * @brief TIM9 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM9_Init(void)
+{
+
+  /* USER CODE BEGIN TIM9_Init 0 */
+
+  /* USER CODE END TIM9_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+
+  /* USER CODE BEGIN TIM9_Init 1 */
+
+  /* USER CODE END TIM9_Init 1 */
+  htim9.Instance = TIM9;
+  htim9.Init.Prescaler = 7199;
+  htim9.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim9.Init.Period = 9999;
+  htim9.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim9.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim9) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim9, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM9_Init 2 */
+
+  /* USER CODE END TIM9_Init 2 */
 
 }
 
